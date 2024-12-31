@@ -56,7 +56,7 @@ impl<B: UsbBus, const N: usize> UsbClass<B> for UsbLogChannel<'_, B, N> {
         writer.endpoint(&self.ep_in)
     }
 
-    fn get_string(&self, index: StringIndex, _lang_id: u16) -> Option<&str> {
+    fn get_string(&self, index: StringIndex, _lang_id: LangID) -> Option<&str> {
         if index == self.iface_string {
             Some(self.label)
         } else {
