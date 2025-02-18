@@ -12,20 +12,22 @@ use usb_device::{class_prelude::*, Result};
 
 const EP_SIZE: usize = 64;
 
+const INTERFACE_NAME: &str = "kiffielog";
+
 pub struct UsbLogChannel<'a, B: UsbBus, const N: usize> {
     iface: InterfaceNumber,
     iface_string: StringIndex,
     ep_in: EndpointIn<'a, B>,
-    label: &'a str,
     log_buffer: &'a LogBuffer<N>,
     packet_buffer: [u8; EP_SIZE],
     packet_buffer_len: usize,
 }
 
 impl<'a, B: UsbBus, const N: usize> UsbLogChannel<'a, B, N> {
+
+    /// Create a new USB log channel
     pub fn new(
         alloc: &'a UsbBusAllocator<B>,
-        label: &'a str,
         log_buffer: &'a LogBuffer<N>,
     ) -> UsbLogChannel<'a, B, N> {
         let iface = alloc.interface();
@@ -37,13 +39,15 @@ impl<'a, B: UsbBus, const N: usize> UsbLogChannel<'a, B, N> {
             iface,
             iface_string,
             ep_in,
-            label,
             log_buffer,
             packet_buffer,
             packet_buffer_len,
         }
     }
 
+    /// Periodic tasks.
+    ///
+    /// his needs to be called periodically to process the log messages.
     pub fn tasks(&mut self) {
         self.poll();
     }
@@ -58,7 +62,7 @@ impl<B: UsbBus, const N: usize> UsbClass<B> for UsbLogChannel<'_, B, N> {
 
     fn get_string(&self, index: StringIndex, _lang_id: LangID) -> Option<&str> {
         if index == self.iface_string {
-            Some(self.label)
+            Some(INTERFACE_NAME)
         } else {
             None
         }

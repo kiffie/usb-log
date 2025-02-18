@@ -8,6 +8,9 @@ use core::fmt::Write;
 use critical_section::Mutex;
 use log::{Metadata, Record};
 
+#[cfg(feature = "rtt-target")]
+use rtt_target::rprint;
+
 struct LogBufferInner<const N: usize> {
     wr: usize,
     rd: usize,
@@ -23,11 +26,16 @@ impl<const N: usize> LogBufferInner<N> {
         }
     }
 
+    /// Returns true if the buffer is full.
+    pub fn is_full(&self) -> bool {
+        Self::inc_mod_n(self.wr) == self.rd
+    }
+
     /// Write a byte
     ///
-    /// Returns an error if buffer is full
+    /// Returns an error if the buffer is full
     fn write(&mut self, byte: u8) -> Result<(), ()> {
-        if Self::inc_mod_n(self.wr) != self.rd {
+        if !self.is_full() {
             let w: usize = self.wr;
             self.buf[w] = byte;
             self.wr = Self::inc_mod_n(self.wr);
@@ -37,22 +45,22 @@ impl<const N: usize> LogBufferInner<N> {
         }
     }
 
-    /// Read a byte
+    /// Returns true if LogBuffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.wr == self.rd
+    }
+
+    /// Read a byte.
     ///
-    /// Returns None if LogBuffer is empty
+    /// Returns None if LogBuffer is empty.
     pub fn read(&mut self) -> Option<u8> {
-        if self.wr != self.rd {
+        if !self.is_empty() {
             let byte = self.buf[self.rd];
             self.rd = Self::inc_mod_n(self.rd);
             Some(byte)
         } else {
             None
         }
-    }
-
-    /// Returns true if LogBuffer is empty
-    pub fn is_empty(&self) -> bool {
-        self.wr == self.rd
     }
 
     fn inc_mod_n(val: usize) -> usize {
@@ -96,13 +104,17 @@ impl<const N: usize> LogBuffer<N> {
 impl<const N: usize> Write for LogBufferInner<N> {
     /// Write a string slice
     ///
-    /// If the buffer is full then the respective characters of the string slice are discarded
+    /// If the buffer is full then the oldest bytes of the buffer are discarded
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         for byte in s.bytes() {
-            if self.write(byte).is_err() {
-                break;
+            // discard the oldest byte if the buffer is full
+            if self.is_full() {
+                self.read();
             }
+            let _ = self.write(byte); // this cannot fail
         }
+        #[cfg(feature = "rtt-target")]
+        rprint!("{}", s);
         Ok(())
     }
 }
