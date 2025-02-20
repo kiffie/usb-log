@@ -5,3 +5,4 @@
 
 pub mod log_buffer;
 pub mod usb_log_channel;
+pub mod usb_log_channel_bulk;
